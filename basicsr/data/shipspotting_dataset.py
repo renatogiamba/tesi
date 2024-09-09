@@ -61,7 +61,7 @@ class ShipSpottingDataset(data.Dataset):
                 if len(opt['gt_path']) > 1:
                     for i in range(len(opt['gt_path'])-1):
                         self.paths.extend(sorted([str(x) for x in Path(opt['gt_path'][i+1]).glob('*.'+opt['image_type'])]))
-        
+
         # limit number of pictures for test
         if 'num_pic' in opt:
             if 'val' or 'test' in opt:
@@ -100,7 +100,7 @@ class ShipSpottingDataset(data.Dataset):
         # TODO: kernel range is now hard-coded, should be in the configure file
         self.pulse_tensor = torch.zeros(21, 21).float()  # convolving with pulse tensor brings no blurry effect
         self.pulse_tensor[10, 10] = 1
-        self.meta_info = get_all_csv_info_as_dict("/mnt/media/luigi/dataset/ShipSpotting/used")
+        self.meta_info = get_all_csv_info_as_dict("ShipinSight/content/train")
 
     def __getitem__(self, index):
         if self.file_client is None:
@@ -127,21 +127,21 @@ class ShipSpottingDataset(data.Dataset):
                 break
             finally:
                 retry -= 1
-        
+
         # img_gt = imfrombytes(img_bytes, float32=True)
         # filter the dataset and remove images with too low quality
         img_size = os.path.getsize(gt_path)
         img_size = img_size/1024
 
-        while img_gt.shape[0] * img_gt.shape[1] < 384*384 or img_size<100:
-            index = random.randint(0, self.__len__()-1)
-            gt_path = self.paths[index]
-
-            time.sleep(0.1)  # sleep 1s for occasional server congestion
-            img_bytes = self.file_client.get(gt_path, 'gt')
-            img_gt = imfrombytes(img_bytes, float32=True)
-            img_size = os.path.getsize(gt_path)
-            img_size = img_size/1024
+        #while img_gt.shape[0] * img_gt.shape[1] < 384*384 or img_size<100:
+        #    index = random.randint(0, self.__len__()-1)
+        #    gt_path = self.paths[index]
+#
+        #    time.sleep(0.1)  # sleep 1s for occasional server congestion
+        #    img_bytes = self.file_client.get(gt_path, 'gt')
+        #    img_gt = imfrombytes(img_bytes, float32=True)
+        #    img_size = os.path.getsize(gt_path)
+        #    img_size = img_size/1024
 
         # -------------------- Do augmentation for training: flip, rotation -------------------- #
         img_gt = augment(img_gt, self.opt['use_hflip'], self.opt['use_rot'])
@@ -227,33 +227,41 @@ class ShipSpottingDataset(data.Dataset):
 
         return_d = {'gt': img_gt, 'kernel1': kernel, 'kernel2': kernel2, 'sinc_kernel': sinc_kernel, 'gt_path': gt_path}
         
-        ship_name, ship_category, ship_type = self.get_vessel_name_and_category_and_vessel_type(index)
-        text_prompt = self.create_sentence(ship_category, ship_name)
+        category, country, longitude, latitude, cloud_cover, year, month, day = self.get_vessel_name_and_category_and_vessel_type(index)
+        text_prompt = self.create_sentence(category, country, longitude, latitude, year)
+        return_d['longitude'] = longitude
+        return_d['latitude'] = latitude
+        return_d['cloud_cover'] = cloud_cover
+        return_d['year'] = year
+        return_d['month'] = month
+        return_d['day'] = day
         return_d['text_prompt'] = text_prompt
         return return_d
-    
 
-    def create_sentence(self,category, ship_name):
+
+    def create_sentence(self, category, country, longitude, latitude, year):
         sentences = [
-            "High resolution image of a ship named {} which is a majestic {}.",
-            "High resolution image of {}, a well-known ship in the {} category.",
-            "High resolution image of the ship {} which is quite popular among {} ships.",
-            # "High resolution image of the ship {} named {} is truly a sight to behold.",
-            "High resolution image of the {} which stands out among the {} ships."
+            "A fmow satellite image of a {} "+
+           "in the state {} at longitude {} and latitude {} in the year {}.",
         ]
         sentence = random.choice(sentences)
-        return sentence.format(ship_name, category)
+        return sentence.format(category, country, longitude, latitude, year)
 
     def get_vessel_name_and_category_and_vessel_type(self, idx):
         # "3548158": {"image_title": "NARRABEEN & FAIRSTAR",
-        #  "vessel_type": "Passengers Ship", 
+        #  "vessel_type": "Passengers Ship",
         # "ship_category": "Passenger Vessels",
         #  "current_name": "NARRABEEN"}
         path_name = self.paths[idx]
-        ship_type = self.meta_info[os.path.basename(path_name)[:-4]]['vessel_type']
-        ship_name = self.meta_info[os.path.basename(path_name)[:-4]]['current_name']
-        ship_category = self.meta_info[os.path.basename(path_name)[:-4]]['ship_category']
-        return ship_name, ship_category, ship_type
+        category = self.meta_info[os.path.basename(path_name)[:-4]]['category']
+        country = self.meta_info[os.path.basename(path_name)[:-4]]['country']
+        longitude = self.meta_info[os.path.basename(path_name)[:-4]]['longitude']
+        latitude = self.meta_info[os.path.basename(path_name)[:-4]]['latitude']
+        cloud_cover = self.meta_info[os.path.basename(path_name)[:-4]]['cloud_cover']
+        year = self.meta_info[os.path.basename(path_name)[:-4]]['year']
+        month = self.meta_info[os.path.basename(path_name)[:-4]]['month']
+        day = self.meta_info[os.path.basename(path_name)[:-4]]['day']
+        return category, country, longitude, latitude, cloud_cover, year, month, day
 
     def __len__(self):
         return len(self.paths)
@@ -269,10 +277,14 @@ def extract_info_from_csv(csv_file, mini_dict):
         for row in csv_reader:
             mini_dict[row[0]] = {}
             # mini_dict = row[0]
-            mini_dict[row[0]]['image_title'] = row[1]
-            mini_dict[row[0]]['vessel_type'] = row[2]
-            mini_dict[row[0]]['ship_category'] = row[3]
-            mini_dict[row[0]]['current_name'] = row[4]
+            mini_dict[row[0]]['category'] = row[1]
+            mini_dict[row[0]]['country'] = row[2]
+            mini_dict[row[0]]['longitude'] = row[3]
+            mini_dict[row[0]]['latitude'] = row[4]
+            mini_dict[row[0]]['cloud_cover'] = row[5]
+            mini_dict[row[0]]['year'] = row[6]
+            mini_dict[row[0]]['month'] = row[7]
+            mini_dict[row[0]]['day'] = row[8]
             line_count += 1
 
         # print(f'Processed {line_count} lines.')
@@ -294,5 +306,3 @@ def get_all_csv_info_as_dict(path):
     for i in range(len(csvs)):
         diz = extract_info_from_csv(csvs[i], diz)
     return diz
-    # print(len(diz))
-    # print(diz['2988424'])

@@ -25,6 +25,7 @@ from ldm.modules.distributions.distributions import normal_kl, DiagonalGaussianD
 from ldm.models.autoencoder import VQModelInterface, IdentityFirstStage, AutoencoderKL
 from ldm.modules.diffusionmodules.util import make_beta_schedule, extract_into_tensor, noise_like
 from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.modules.diffusionmodules.util import linear,timestep_embedding
 
 from basicsr.utils import DiffJPEG, USMSharp
 from basicsr.utils.img_process_util import filter2D
@@ -1587,6 +1588,7 @@ class LatentDiffusionSRTextWT(DDPM):
                  guidance_loss_scale = 30,
                  ship_embedder_config=None,
                  wav_encoder=None,
+                 use_metadata=True,
                  *args, **kwargs):
         # put this in your init
         self.num_timesteps_cond = default(num_timesteps_cond, 1)
@@ -1597,6 +1599,7 @@ class LatentDiffusionSRTextWT(DDPM):
         self.time_replace = time_replace
         self.use_usm = use_usm
         self.mix_ratio = mix_ratio
+        self.use_metadata = use_metadata
         assert self.num_timesteps_cond <= kwargs['timesteps']
         # for backwards compatibility after implementation of DiffusionWrapper
         if conditioning_key is None:
@@ -2131,6 +2134,29 @@ class LatentDiffusionSRTextWT(DDPM):
         if hasattr(self, "ship_classifier"):
             classes_embedding = self.ship_label_emb(self.ship_classifier(y))
             # print(e, "\nNo ship classifier found")
+        
+        if hasattr(self, "use_metadata"):
+            model_channels = 256
+            time_embed_dim = model_channels * 4
+            self.time_embed = nn.Sequential(
+              linear(model_channels, time_embed_dim),
+              nn.SiLU(),
+              linear(time_embed_dim, time_embed_dim),
+            )
+            long_t = torch.tensor([float(batch["latitude"])]).to(self.device).long()
+            long_emb = self.time_embed(timestep_embedding(long_t, self.model_channels))
+            lat_t = torch.tensor([float(batch["latitude"])]).to(self.device).long()
+            lat_emb = self.time_embed(timestep_embedding(lat_t, self.model_channels))
+            cloud_t = torch.tensor([float(batch["cloud_cover"])]).to(self.device).long()
+            cloud_emb = self.time_embed(timestep_embedding(cloud_t, self.model_channels))
+            year_t = torch.tensor([float(batch["year"])]).to(self.device).long()
+            year_emb = self.time_embed(timestep_embedding(year_t, self.model_channels))
+            month_t = torch.tensor([float(batch["month"])]).to(self.device).long()
+            month_emb = self.time_embed(timestep_embedding(month_t, self.model_channels))
+            day_t = torch.tensor([float(batch["day"])]).to(self.device).long()
+            day_emb = self.time_embed(timestep_embedding(day_t, self.model_channels))
+            metadata_embeddings = long_emb + lat_emb + cloud_emb + year_emb + month_emb + day_emb
+            
         if hasattr(self, "dwt"):
             xll, xh = self.dwt(x)  # [b, 3, h, w], [b, 3, 3, h, w]
             xlh, xhl, xhh = torch.unbind(xh[0], dim=2)
@@ -2169,8 +2195,10 @@ class LatentDiffusionSRTextWT(DDPM):
         if return_original_cond:
             out.append(xc)
         
-        if hasattr(self, "ship_classifier"):
-            out.append(classes_embedding)
+        #if hasattr(self, "ship_classifier"):
+        #    out.append(classes_embedding)
+        if hasattr(self, "use_metadata"):
+            out.append(metadata_embeddings)
         elif hasattr(self, "dwt"):
             out.append(x_lq_wav)
         else:

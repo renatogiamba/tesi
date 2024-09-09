@@ -1526,7 +1526,8 @@ class EncoderUNetModelWT(nn.Module):
         """
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
         if class_embed is not None:
-            emb = th.cat([emb,class_embed],dim=1)
+            #emb = th.cat([emb,class_embed],dim=1)
+            emb = emb + class_embed
         result_list = []
         results = {}
         h = x.type(self.dtype)
