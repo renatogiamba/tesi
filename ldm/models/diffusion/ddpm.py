@@ -2136,26 +2136,26 @@ class LatentDiffusionSRTextWT(DDPM):
             # print(e, "\nNo ship classifier found")
         
         if hasattr(self, "use_metadata"):
-            model_channels = 256
-            time_embed_dim = model_channels * 4
+            self.model_channels = 256
+            time_embed_dim = self.model_channels * 4
             self.time_embed = nn.Sequential(
-              linear(model_channels, time_embed_dim),
+              linear(self.model_channels, time_embed_dim),
               nn.SiLU(),
               linear(time_embed_dim, time_embed_dim),
             )
             self.time_embed.to(self.device)
             
-            long_t = torch.tensor([float(batch["latitude"])]).to(self.device).long()
+            long_t = torch.tensor([float(val) for val in batch["longitude"]]).to(self.device).long()
             long_emb = self.time_embed(timestep_embedding(long_t, self.model_channels))
-            lat_t = torch.tensor([float(batch["latitude"])]).to(self.device).long()
+            lat_t = torch.tensor([float(val) for val in batch["latitude"]]).to(self.device).long()
             lat_emb = self.time_embed(timestep_embedding(lat_t, self.model_channels))
-            cloud_t = torch.tensor([float(batch["cloud_cover"])]).to(self.device).long()
+            cloud_t = torch.tensor([float(val) for val in batch["cloud_cover"]]).to(self.device).long()
             cloud_emb = self.time_embed(timestep_embedding(cloud_t, self.model_channels))
-            year_t = torch.tensor([float(batch["year"])]).to(self.device).long()
+            year_t = torch.tensor([float(val) for val in batch["year"]]).to(self.device).long()
             year_emb = self.time_embed(timestep_embedding(year_t, self.model_channels))
-            month_t = torch.tensor([float(batch["month"])]).to(self.device).long()
+            month_t = torch.tensor([float(val) for val in batch["month"]]).to(self.device).long()
             month_emb = self.time_embed(timestep_embedding(month_t, self.model_channels))
-            day_t = torch.tensor([float(batch["day"])]).to(self.device).long()
+            day_t = torch.tensor([float(val) for val in batch["day"]]).to(self.device).long()
             day_emb = self.time_embed(timestep_embedding(day_t, self.model_channels))
             metadata_embeddings = long_emb + lat_emb + cloud_emb + year_emb + month_emb + day_emb
             
