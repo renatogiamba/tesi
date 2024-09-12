@@ -6,7 +6,7 @@ https://github.com/CompVis/taming-transformers
 -- merci
 """
 
-from pytorch_wavelets import DWTForward, DWTInverse
+#from pytorch_wavelets import DWTForward, DWTInverse
 import torch
 import torch.nn as nn
 import numpy as np
@@ -2143,6 +2143,8 @@ class LatentDiffusionSRTextWT(DDPM):
               nn.SiLU(),
               linear(time_embed_dim, time_embed_dim),
             )
+            self.time_embed.to(self.device)
+            
             long_t = torch.tensor([float(batch["latitude"])]).to(self.device).long()
             long_emb = self.time_embed(timestep_embedding(long_t, self.model_channels))
             lat_t = torch.tensor([float(batch["latitude"])]).to(self.device).long()
