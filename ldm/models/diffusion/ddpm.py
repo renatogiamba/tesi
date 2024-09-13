@@ -2145,10 +2145,8 @@ class LatentDiffusionSRTextWT(DDPM):
             )
             self.time_embed.to(self.device)
             
-            long_t = torch.tensor([float(val) for val in batch["longitude"]]).to(self.device).long()
-            long_emb = self.time_embed(timestep_embedding(long_t, self.model_channels))
-            lat_t = torch.tensor([float(val) for val in batch["latitude"]]).to(self.device).long()
-            lat_emb = self.time_embed(timestep_embedding(lat_t, self.model_channels))
+            gsd_t = torch.tensor([float(val) for val in batch["gsd"]]).to(self.device).long()
+            gsd_emb = self.time_embed(timestep_embedding(gsd_t, self.model_channels))
             cloud_t = torch.tensor([float(val) for val in batch["cloud_cover"]]).to(self.device).long()
             cloud_emb = self.time_embed(timestep_embedding(cloud_t, self.model_channels))
             year_t = torch.tensor([float(val) for val in batch["year"]]).to(self.device).long()
@@ -2157,7 +2155,7 @@ class LatentDiffusionSRTextWT(DDPM):
             month_emb = self.time_embed(timestep_embedding(month_t, self.model_channels))
             day_t = torch.tensor([float(val) for val in batch["day"]]).to(self.device).long()
             day_emb = self.time_embed(timestep_embedding(day_t, self.model_channels))
-            metadata_embeddings = long_emb + lat_emb + cloud_emb + year_emb + month_emb + day_emb
+            metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
             
         if hasattr(self, "dwt"):
             xll, xh = self.dwt(x)  # [b, 3, h, w], [b, 3, 3, h, w]
