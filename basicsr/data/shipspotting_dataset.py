@@ -43,7 +43,7 @@ class ShipSpottingDataset(data.Dataset):
         else:
             self.crop_size = 512
         if 'image_type' not in opt:
-            opt['image_type'] = 'png'
+            opt['image_type'] = 'jpg'
 
         # support multiple type of data: file path and meta data, remove support of lmdb
         self.paths = []
@@ -133,15 +133,15 @@ class ShipSpottingDataset(data.Dataset):
         img_size = os.path.getsize(gt_path)
         img_size = img_size/1024
 
-        #while img_gt.shape[0] * img_gt.shape[1] < 384*384 or img_size<100:
-        #    index = random.randint(0, self.__len__()-1)
-        #    gt_path = self.paths[index]
-#
-        #    time.sleep(0.1)  # sleep 1s for occasional server congestion
-        #    img_bytes = self.file_client.get(gt_path, 'gt')
-        #    img_gt = imfrombytes(img_bytes, float32=True)
-        #    img_size = os.path.getsize(gt_path)
-        #    img_size = img_size/1024
+        while img_gt.shape[0] * img_gt.shape[1] < 384*384 or img_size<100:
+            index = random.randint(0, self.__len__()-1)
+            gt_path = self.paths[index]
+
+            time.sleep(0.1)  # sleep 1s for occasional server congestion
+            img_bytes = self.file_client.get(gt_path, 'gt')
+            img_gt = imfrombytes(img_bytes, float32=True)
+            img_size = os.path.getsize(gt_path)
+            img_size = img_size/1024
 
         # -------------------- Do augmentation for training: flip, rotation -------------------- #
         img_gt = augment(img_gt, self.opt['use_hflip'], self.opt['use_rot'])
@@ -227,10 +227,9 @@ class ShipSpottingDataset(data.Dataset):
 
         return_d = {'gt': img_gt, 'kernel1': kernel, 'kernel2': kernel2, 'sinc_kernel': sinc_kernel, 'gt_path': gt_path}
         
-        category, country, longitude, latitude, cloud_cover, year, month, day = self.get_vessel_name_and_category_and_vessel_type(index)
-        text_prompt = self.create_sentence(category, country, longitude, latitude, year)
-        return_d['longitude'] = longitude
-        return_d['latitude'] = latitude
+        category, country, gsd, cloud_cover, year, month, day = self.get_vessel_name_and_category_and_vessel_type(index)
+        text_prompt = self.create_sentence(category, country, year)
+        return_d['gsd'] = gsd
         return_d['cloud_cover'] = cloud_cover
         return_d['year'] = year
         return_d['month'] = month
@@ -239,13 +238,13 @@ class ShipSpottingDataset(data.Dataset):
         return return_d
 
 
-    def create_sentence(self, category, country, longitude, latitude, year):
+    def create_sentence(self, category, country, year):
         sentences = [
             "A fmow satellite image of a {} "+
-           "in the state {} at longitude {} and latitude {} in the year {}.",
+           "in the state {} in the year {}.",
         ]
         sentence = random.choice(sentences)
-        return sentence.format(category, country, longitude, latitude, year)
+        return sentence.format(category, country, year)
 
     def get_vessel_name_and_category_and_vessel_type(self, idx):
         # "3548158": {"image_title": "NARRABEEN & FAIRSTAR",
@@ -255,13 +254,12 @@ class ShipSpottingDataset(data.Dataset):
         path_name = self.paths[idx]
         category = self.meta_info[os.path.basename(path_name)[:-4]]['category']
         country = self.meta_info[os.path.basename(path_name)[:-4]]['country']
-        longitude = self.meta_info[os.path.basename(path_name)[:-4]]['longitude']
-        latitude = self.meta_info[os.path.basename(path_name)[:-4]]['latitude']
+        gsd = self.meta_info[os.path.basename(path_name)[:-4]]['gsd']
         cloud_cover = self.meta_info[os.path.basename(path_name)[:-4]]['cloud_cover']
         year = self.meta_info[os.path.basename(path_name)[:-4]]['year']
         month = self.meta_info[os.path.basename(path_name)[:-4]]['month']
         day = self.meta_info[os.path.basename(path_name)[:-4]]['day']
-        return category, country, longitude, latitude, cloud_cover, year, month, day
+        return category, country, gsd, cloud_cover, year, month, day
 
     def __len__(self):
         return len(self.paths)
@@ -279,12 +277,11 @@ def extract_info_from_csv(csv_file, mini_dict):
             # mini_dict = row[0]
             mini_dict[row[0]]['category'] = row[1]
             mini_dict[row[0]]['country'] = row[2]
-            mini_dict[row[0]]['longitude'] = row[3]
-            mini_dict[row[0]]['latitude'] = row[4]
-            mini_dict[row[0]]['cloud_cover'] = row[5]
-            mini_dict[row[0]]['year'] = row[6]
-            mini_dict[row[0]]['month'] = row[7]
-            mini_dict[row[0]]['day'] = row[8]
+            mini_dict[row[0]]['gsd'] = row[3]
+            mini_dict[row[0]]['cloud_cover'] = row[4]
+            mini_dict[row[0]]['year'] = row[5]
+            mini_dict[row[0]]['month'] = row[6]
+            mini_dict[row[0]]['day'] = row[7]
             line_count += 1
 
         # print(f'Processed {line_count} lines.')
