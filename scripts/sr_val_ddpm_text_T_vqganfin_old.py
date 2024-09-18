@@ -3,6 +3,7 @@
 import argparse, os, sys, glob
 import PIL
 import torch
+import torch.nn as nn
 import numpy as np
 import torchvision
 from omegaconf import OmegaConf
@@ -22,6 +23,8 @@ from ldm.models.diffusion.plms import PLMSSampler
 import math
 import copy
 from scripts.wavelet_color_fix import wavelet_reconstruction, adaptive_instance_normalization
+from basicsr.data.shipspotting_dataset import get_all_csv_info_as_dict, list_all_csv_files, extract_info_from_csv
+from ldm.modules.diffusionmodules.util import linear,timestep_embedding
 
 def space_timesteps(num_timesteps, section_counts):
 	"""
@@ -122,6 +125,16 @@ def load_img(path):
 	image = image[None].transpose(0, 3, 1, 2)
 	image = torch.from_numpy(image)
 	return 2.*image - 1.
+
+def get_metadata(meta_info):
+    category = meta_info['0']['category']
+    country = meta_info['0']['country']
+    gsd = meta_info['0']['gsd']
+    cloud_cover = meta_info['0']['cloud_cover']
+    year = meta_info['0']['year']
+    month = meta_info['0']['month']
+    day = meta_info['0']['day']
+    return category, country, gsd, cloud_cover, year, month, day
 
 
 def main():
@@ -285,6 +298,7 @@ def main():
 	model.ori_timesteps = list(use_timesteps)
 	model.ori_timesteps.sort()
 	model = model.to(device)
+	meta_info = get_all_csv_info_as_dict("/content/ShipinSight/content/test")
 
 	precision_scope = autocast if opt.precision == "autocast" else nullcontext
 	niqe_list = []
@@ -294,13 +308,34 @@ def main():
 				tic = time.time()
 				all_samples = list()
 				for n in trange(niters, desc="Sampling"):
+					category, country, gsd, cloud_cover, year, month, day = get_metadata(meta_info)
 					init_image = init_image_list[n]
 					init_latent_generator, enc_fea_lq = vq_model.encode(init_image)
 					init_latent = model.get_first_stage_encoding(init_latent_generator)
 					text_init = ['']*init_image.size(0)
 					semantic_c = model.cond_stage_model(text_init)
-					try:
-						classes_embed = model.ship_label_emb(model.ship_classifier(init_image))
+					try:	
+						model_channels = 256
+						time_embed_dim = model_channels * 4
+						time_embed = nn.Sequential(
+            			  		linear(model_channels, time_embed_dim),
+            			  		nn.SiLU(),
+            			  		linear(time_embed_dim, time_embed_dim),
+            					)
+						time_embed.to(device)
+
+						gsd_t = torch.tensor([float("gsd")]).to(device).long()
+						gsd_emb = time_embed(timestep_embedding(gsd_t, model_channels))
+						cloud_t = torch.tensor([float("cloud_cover")]).to(device).long()
+						cloud_emb = time_embed(timestep_embedding(cloud_t, model_channels))
+						year_t = torch.tensor([float("year")]).to(device).long()
+						year_emb = time_embed(timestep_embedding(year_t, model_channels))
+						month_t = torch.tensor([float("month")]).to(device).long()
+						month_emb = time_embed(timestep_embedding(month_t, model_channels))
+						day_t = torch.tensor([float("day")]).to(device).long()
+						day_emb = time_embed(timestep_embedding(day_t, model_channels))
+						metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
+						#classes_embed = model.ship_label_emb(model.ship_classifier(init_image))
 					except:
 						classes_embed = None
 						print("No class embed")
@@ -313,7 +348,7 @@ def main():
 
 					samples, _ = model.sample(cond=semantic_c, struct_cond=init_latent, batch_size=init_image.size(0), 
 							   timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True,
-							   classes_embed=classes_embed)
+							   classes_embed=metadata_embeddings)
 					x_samples = vq_model.decode(samples * 1. / model.scale_factor, enc_fea_lq)
 					if opt.colorfix_type == 'adain':
 						x_samples = adaptive_instance_normalization(x_samples, init_image)
