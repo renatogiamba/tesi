@@ -298,7 +298,7 @@ def main():
 	model.ori_timesteps = list(use_timesteps)
 	model.ori_timesteps.sort()
 	model = model.to(device)
-	meta_info = get_all_csv_info_as_dict("/content/ShipinSight/content/test")
+	meta_info = get_all_csv_info_as_dict("/content/ShipinSight/content/test_csv")
 
 	precision_scope = autocast if opt.precision == "autocast" else nullcontext
 	niqe_list = []
@@ -324,15 +324,15 @@ def main():
             					)
 						time_embed.to(device)
 
-						gsd_t = torch.tensor([float("gsd")]).to(device).long()
+						gsd_t = torch.tensor([float(gsd)]).to(device).long()
 						gsd_emb = time_embed(timestep_embedding(gsd_t, model_channels))
-						cloud_t = torch.tensor([float("cloud_cover")]).to(device).long()
+						cloud_t = torch.tensor([float(cloud_cover)]).to(device).long()
 						cloud_emb = time_embed(timestep_embedding(cloud_t, model_channels))
-						year_t = torch.tensor([float("year")]).to(device).long()
+						year_t = torch.tensor([float(year)]).to(device).long()
 						year_emb = time_embed(timestep_embedding(year_t, model_channels))
-						month_t = torch.tensor([float("month")]).to(device).long()
+						month_t = torch.tensor([float(month)]).to(device).long()
 						month_emb = time_embed(timestep_embedding(month_t, model_channels))
-						day_t = torch.tensor([float("day")]).to(device).long()
+						day_t = torch.tensor([float(day)]).to(device).long()
 						day_emb = time_embed(timestep_embedding(day_t, model_channels))
 						metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
 						#classes_embed = model.ship_label_emb(model.ship_classifier(init_image))
