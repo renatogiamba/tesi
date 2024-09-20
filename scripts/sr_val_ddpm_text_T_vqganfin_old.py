@@ -2,6 +2,7 @@
 
 import argparse, os, sys, glob
 import PIL
+import random
 import torch
 import torch.nn as nn
 import numpy as np
@@ -312,7 +313,10 @@ def main():
 					init_image = init_image_list[n]
 					init_latent_generator, enc_fea_lq = vq_model.encode(init_image)
 					init_latent = model.get_first_stage_encoding(init_latent_generator)
-					text_init = ['']*init_image.size(0)
+					#text_init = ['']*init_image.size(0)
+					sentences = ["A fmow satellite image of a {} in the state {} in the year {}.",]
+					text_init = random.choice(sentences)
+					text_init.format(category, country, year)
 					semantic_c = model.cond_stage_model(text_init)
 					try:	
 						model_channels = 256
