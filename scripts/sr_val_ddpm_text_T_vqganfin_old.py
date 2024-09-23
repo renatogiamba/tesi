@@ -310,7 +310,9 @@ def main():
 				all_samples = list()
 				for n in trange(niters, desc="Sampling"):
 					category, country, gsd, cloud_cover, year, month, day = get_metadata(meta_info)
-					init_image = init_image_list[n]
+					#init_image = init_image_list[n]
+					samples = init_image_list[n]
+					init_latent, text_init, latent_gt, init_image, gt, gt_recon = model.get_input(samples, return_first_stage_outputs=True)
 					init_latent_generator, enc_fea_lq = vq_model.encode(init_image)
 					init_latent = model.get_first_stage_encoding(init_latent_generator)
 					#text_init = ['']*init_image.size(0)

@@ -22,6 +22,7 @@ import math
 import copy
 
 from basicsr.utils import DiffJPEG
+from basicsr.data.shipspotting_dataset import ShipSpottingDataset
 from basicsr.data.realesrgan_dataset import RealESRGANDataset
 from torch.utils.data import random_split, DataLoader, Dataset, Subset
 
@@ -327,7 +328,7 @@ def main():
     base_i = opt.base_i
 
     # data
-    dataset = RealESRGANDataset(config.test_data.params.test.params)
+    dataset = ShipSpottingDataset(config.test_data.params.test.params)
     test_dataloader = DataLoader(
         dataset,
         batch_size=config.test_data.params.batch_size,

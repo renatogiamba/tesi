@@ -121,6 +121,7 @@ degradation:
   jpeg_range2: [60, 100]
 
   gt_size: 512
+  no_degradation_prob: 0.01
 
 data:
   target: main.DataModuleFromConfig
@@ -200,7 +201,7 @@ test_data:
     test:
       target: basicsr.data.realesrgan_dataset.RealESRGANDataset
       params:
-        gt_path: ['/mnt/lustre/share/jywang/dataset/DIV8K/train_HR/']
+        gt_path: /content/drive/MyDrive/Tesi/fmow/content/test
         #face_gt_path: '/mnt/lustre/share/jywang/dataset/FFHQ/512_ffhq/512/'
         #num_face: 2000
         crop_size: 512
