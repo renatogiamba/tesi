@@ -1,6 +1,6 @@
 """make variations of input image"""
 
-import argparse, os, sys, glob
+import argparse, os, sys, glob, csv
 import PIL
 import random
 import torch
@@ -24,7 +24,6 @@ from ldm.models.diffusion.plms import PLMSSampler
 import math
 import copy
 from scripts.wavelet_color_fix import wavelet_reconstruction, adaptive_instance_normalization
-from basicsr.data.shipspotting_dataset import get_all_csv_info_as_dict, list_all_csv_files, extract_info_from_csv
 from ldm.modules.diffusionmodules.util import linear,timestep_embedding
 
 def space_timesteps(num_timesteps, section_counts):
@@ -127,15 +126,52 @@ def load_img(path):
 	image = torch.from_numpy(image)
 	return 2.*image - 1.
 
+def extract_info_from_csv(csv_file, mini_dict):
+    with open(csv_file) as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        line_count = 0
+        # mini_dict = {}
+        next(csv_reader)
+
+        for row in csv_reader:
+            mini_dict[row[0]] = {}
+            # mini_dict = row[0]
+            mini_dict[row[0]]['gsd'] = row[1]
+            mini_dict[row[0]]['cloud_cover'] = row[2]
+            mini_dict[row[0]]['year'] = row[3]
+            mini_dict[row[0]]['month'] = row[4]
+            mini_dict[row[0]]['day'] = row[5]
+            mini_dict[row[0]]['text_prompt'] = row[6]
+            line_count += 1
+
+        # print(f'Processed {line_count} lines.')
+        return mini_dict
+
+
+#function to list all csv files in path and subpath
+def list_all_csv_files(path):
+    ls = []
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.endswith(".csv"):
+                ls.append(os.path.join(root, file))
+    return ls
+
+def get_all_csv_info_as_dict(path):
+    csvs = list_all_csv_files(path)
+    diz = {}
+    for i in range(len(csvs)):
+        diz = extract_info_from_csv(csvs[i], diz)
+    return diz
+
 def get_metadata(meta_info):
-    category = meta_info['0']['category']
-    country = meta_info['0']['country']
     gsd = meta_info['0']['gsd']
     cloud_cover = meta_info['0']['cloud_cover']
     year = meta_info['0']['year']
     month = meta_info['0']['month']
     day = meta_info['0']['day']
-    return category, country, gsd, cloud_cover, year, month, day
+    text_prompt = meta_info['0']['text_prompt']
+    return gsd, cloud_cover, year, month, day, text_prompt
 
 
 def main():
@@ -309,14 +345,12 @@ def main():
 				tic = time.time()
 				all_samples = list()
 				for n in trange(niters, desc="Sampling"):
-					category, country, gsd, cloud_cover, year, month, day = get_metadata(meta_info)
+					gsd, cloud_cover, year, month, day, text_prompt = get_metadata(meta_info)
 					init_image = init_image_list[n]
 					init_latent_generator, enc_fea_lq = vq_model.encode(init_image)
 					init_latent = model.get_first_stage_encoding(init_latent_generator)
 					#text_init = ['']*init_image.size(0)
-					sentences = ["A fmow satellite image of a {} in the state {} in the year {}.",]
-					text_init = random.choice(sentences)
-					text_init.format(category, country, year)
+					text_init = text_prompt
 					semantic_c = model.cond_stage_model(text_init)
 					try:	
 						model_channels = 256

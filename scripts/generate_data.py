@@ -148,8 +148,6 @@ def load_img(path):
 
 def write_csv(batch_idx, samples):
     with open('output.csv', 'a', newline='') as csvfile:
-        print(batch_idx)
-        print(samples)
         writer = csv.writer(csvfile)
         writer.writerow([
                     batch_idx,
