@@ -148,16 +148,18 @@ def load_img(path):
 
 def write_csv(batch_idx, samples):
     with open('output.csv', 'a', newline='') as csvfile:
+        print(batch_idx)
+        print(samples)
         writer = csv.writer(csvfile)
-        writer.writerow({
-                    'index': f"{batch_idx}",
-                    'gsd': samples['gsd'][0],
-                    'cloud_cover': samples['cloud_cover'][0],
-                    'year': samples['year'][0],
-                    'month': samples['month'][0],
-                    'day': samples['day'][0],
-                    'text_prompt': samples['text_prompt'][0]
-                    })
+        writer.writerow([
+                    batch_idx,
+                    samples['gsd'][0],
+                    samples['cloud_cover'][0],
+                    samples['year'][0],
+                    samples['month'][0],
+                    samples['day'][0],
+                    samples['text_prompt'][0]
+                    ])
 
 def main():
     parser = argparse.ArgumentParser()
