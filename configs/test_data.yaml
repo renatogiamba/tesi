@@ -195,8 +195,8 @@ data:
 test_data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 6
-    num_workers: 6
+    batch_size: 1
+    num_workers: 1
     wrap: false
     test:
       target: basicsr.data.realesrgan_dataset.RealESRGANDataset
