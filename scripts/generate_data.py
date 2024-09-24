@@ -146,6 +146,18 @@ def load_img(path):
     image = torch.from_numpy(image)
     return 2.*image - 1.
 
+def write_csv(batch_idx, samples):
+    with open('output.csv', 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow({
+                    'index': f"{batch_idx}",
+                    'gsd': samples['gsd'][0],
+                    'cloud_cover': samples['cloud_cover'][0],
+                    'year': samples['year'][0],
+                    'month': samples['month'][0],
+                    'day': samples['day'][0],
+                    'text_prompt': samples['text_prompt'][0]
+                    })
 
 def main():
     parser = argparse.ArgumentParser()
@@ -337,6 +349,11 @@ def main():
         collate_fn=None,
         pin_memory=False,
      )
+    
+    with open('output.csv', 'w', newline='') as csvfile:
+            fieldnames = ['index', 'gsd', 'cloud_cover', 'year', 'month', 'day', 'text_prompt']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
 
     model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=1000,
                           linear_start=0.00085, linear_end=0.0120, cosine_s=8e-3)
@@ -377,70 +394,49 @@ def main():
             with model.ema_scope():
                 tic = time.time()
                 all_samples = list()
-                with open('output.csv', 'w', newline='') as csvfile:
-                    fieldnames = ['index', 'gsd', 'cloud_cover', 'year', 'month', 'day', 'text_prompt']
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for batch_idx, samples in enumerate(test_dataloader):
-                        writer.writerow({
-                        'index': f"{batch_idx}",
-                        'gsd': samples['gsd'][0],
-                        'cloud_cover': samples['cloud_cover'][0],
-                        'year': samples['year'][0],
-                        'month': samples['month'][0],
-                        'day': samples['day'][0],
-                        'text_prompt': samples['text_prompt'][0]
-                        })
-                        if os.path.exists(os.path.join(latent_path, f"{base_i:08}.npy")):
-                            base_i += 1
-                            total_num += 1
-                            continue
-                        else:
-                            init_latent, text_init, latent_gt, init_image, gt, gt_recon, metadata = model.get_input(samples, return_first_stage_outputs=True)
-                            text_init = ['']*init_image.size(0)
-                            semantic_c = model.cond_stage_model(text_init)
-
-                            noise = torch.randn_like(init_latent)
-                            t = repeat(torch.tensor([999]), '1 -> b', b=init_image.size(0))
-                            t = t.to(device).long()
-                            x_T = model_ori.q_sample(x_start=init_latent, t=t, noise=noise)
-                            # x_T = None
-
-                            samples, _ = model.sample(cond=semantic_c, struct_cond=init_latent, batch_size=init_image.size(0), timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True, adain_fea=None)
-
-                            x_samples = model.decode_first_stage(samples)
-                            x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
-
-                            if not opt.skip_save:
-                                for i in range(init_image.size(0)):
-                                    if torch.isnan(x_samples[i]).any():
-                                        pass
-                                    else:
-                                        x_sample = 255. * rearrange(x_samples[i].cpu().numpy(), 'c h w -> h w c')
-                                        Image.fromarray(x_sample.astype(np.uint8)).save(
-                                            os.path.join(sample_path, f"{base_i:08}.png"))
-
-                                        x_input = 255. * rearrange(init_image[i].cpu().numpy(), 'c h w -> h w c')
-                                        x_input = (x_input+255.)/2
-                                        Image.fromarray(x_input.astype(np.uint8)).save(
-                                            os.path.join(input_path, f"{base_i:08}.png"))
-
-                                        x_gt = 255. * rearrange(gt[i].data.cpu().numpy(), 'c h w -> h w c')
-                                        x_gt = (x_gt+255.)/2
-                                        Image.fromarray(x_gt.astype(np.uint8)).save(
-                                            os.path.join(gt_path, f"{base_i:08}.png"))
-
-                                        x_latent = samples[i].unsqueeze(0)
-                                        x_latent = x_latent.data.cpu().numpy()
-                                        np.save(os.path.join(latent_path, f"{base_i:08}.npy"), x_latent)
-
-                                        base_i += 1
-                                        total_num += 1
-                        # Number of images to generate each time
-                        if total_num > 5000:
-                            break
-
-                    toc = time.time()
+                for batch_idx, samples in enumerate(test_dataloader):
+                    write_csv(batch_idx, samples)
+                    if os.path.exists(os.path.join(latent_path, f"{base_i:08}.npy")):
+                        base_i += 1
+                        total_num += 1
+                        continue
+                    else:
+                        init_latent, text_init, latent_gt, init_image, gt, gt_recon, metadata = model.get_input(samples, return_first_stage_outputs=True)
+                        text_init = ['']*init_image.size(0)
+                        semantic_c = model.cond_stage_model(text_init)
+                        noise = torch.randn_like(init_latent)
+                        t = repeat(torch.tensor([999]), '1 -> b', b=init_image.size(0))
+                        t = t.to(device).long()
+                        x_T = model_ori.q_sample(x_start=init_latent, t=t, noise=noise)
+                        # x_T = None
+                        samples, _ = model.sample(cond=semantic_c, struct_cond=init_latent, batch_size=init_image.size(0), timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True, adain_fea=None)
+                        x_samples = model.decode_first_stage(samples)
+                        x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
+                        if not opt.skip_save:
+                            for i in range(init_image.size(0)):
+                                if torch.isnan(x_samples[i]).any():
+                                    pass
+                                else:
+                                    x_sample = 255. * rearrange(x_samples[i].cpu().numpy(), 'c h w -> h w c')
+                                    Image.fromarray(x_sample.astype(np.uint8)).save(
+                                        os.path.join(sample_path, f"{base_i:08}.png"))
+                                    x_input = 255. * rearrange(init_image[i].cpu().numpy(), 'c h w -> h w c')
+                                    x_input = (x_input+255.)/2
+                                    Image.fromarray(x_input.astype(np.uint8)).save(
+                                        os.path.join(input_path, f"{base_i:08}.png"))
+                                    x_gt = 255. * rearrange(gt[i].data.cpu().numpy(), 'c h w -> h w c')
+                                    x_gt = (x_gt+255.)/2
+                                    Image.fromarray(x_gt.astype(np.uint8)).save(
+                                        os.path.join(gt_path, f"{base_i:08}.png"))
+                                    x_latent = samples[i].unsqueeze(0)
+                                    x_latent = x_latent.data.cpu().numpy()
+                                    np.save(os.path.join(latent_path, f"{base_i:08}.npy"), x_latent)
+                                    base_i += 1
+                                    total_num += 1
+                    # Number of images to generate each time
+                    if total_num > 5000:
+                        break
+                toc = time.time()
 
     print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
           f" \nEnjoy.")
