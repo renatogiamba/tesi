@@ -164,13 +164,14 @@ def get_all_csv_info_as_dict(path):
         diz = extract_info_from_csv(csvs[i], diz)
     return diz
 
-def get_metadata(meta_info):
-    gsd = meta_info['0']['gsd']
-    cloud_cover = meta_info['0']['cloud_cover']
-    year = meta_info['0']['year']
-    month = meta_info['0']['month']
-    day = meta_info['0']['day']
-    text_prompt = meta_info['0']['text_prompt']
+def get_metadata(meta_info, index):
+    index = str(index)
+    gsd = meta_info[index]['gsd']
+    cloud_cover = meta_info[index]['cloud_cover']
+    year = meta_info[index]['year']
+    month = meta_info[index]['month']
+    day = meta_info[index]['day']
+    text_prompt = meta_info[index]['text_prompt']
     return gsd, cloud_cover, year, month, day, text_prompt
 
 
@@ -212,7 +213,7 @@ def main():
 	parser.add_argument(
 		"--n_samples",
 		type=int,
-		default=2,
+		default=1,
 		help="how many samples to produce for each given prompt. A.k.a batch size",
 	)
 	parser.add_argument(
@@ -345,7 +346,7 @@ def main():
 				tic = time.time()
 				all_samples = list()
 				for n in trange(niters, desc="Sampling"):
-					gsd, cloud_cover, year, month, day, text_prompt = get_metadata(meta_info)
+					gsd, cloud_cover, year, month, day, text_prompt = get_metadata(meta_info,n)
 					init_image = init_image_list[n]
 					init_latent_generator, enc_fea_lq = vq_model.encode(init_image)
 					init_latent = model.get_first_stage_encoding(init_latent_generator)
