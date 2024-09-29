@@ -1395,7 +1395,7 @@ class EncoderUNetModelWT(nn.Module):
         self.time_embed = nn.Sequential(
             linear(model_channels, time_embed_dim_),
             nn.SiLU(),
-            linear(time_embed_dim, time_embed_dim_),
+            linear(time_embed_dim_, time_embed_dim_),
         )
 
         self.input_blocks = nn.ModuleList(
