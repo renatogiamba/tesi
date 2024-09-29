@@ -1390,11 +1390,12 @@ class EncoderUNetModelWT(nn.Module):
         self.num_head_channels = num_head_channels
         self.num_heads_upsample = num_heads_upsample
 
-        time_embed_dim = model_channels * 4
+        time_embed_dim = model_channels * 8
+        time_embed_dim_ = model_channels * 4
         self.time_embed = nn.Sequential(
-            linear(model_channels, time_embed_dim),
+            linear(model_channels, time_embed_dim_),
             nn.SiLU(),
-            linear(time_embed_dim, time_embed_dim),
+            linear(time_embed_dim, time_embed_dim_),
         )
 
         self.input_blocks = nn.ModuleList(
@@ -1526,8 +1527,8 @@ class EncoderUNetModelWT(nn.Module):
         """
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
         if class_embed is not None:
-            #emb = th.cat([emb,class_embed],dim=1)
-            emb = emb + class_embed
+            emb = th.cat([emb,class_embed],dim=1)
+            #emb = emb + class_embed
         result_list = []
         results = {}
         h = x.type(self.dtype)
