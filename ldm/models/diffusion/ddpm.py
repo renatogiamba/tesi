@@ -2137,7 +2137,7 @@ class LatentDiffusionSRTextWT(DDPM):
         
         if hasattr(self, "use_metadata"):
             self.model_channels = 256
-            time_embed_dim = self.model_channels * 1/5
+            time_embed_dim = self.model_channels * 4
             self.time_embed = nn.Sequential(
               linear(self.model_channels, time_embed_dim),
               nn.SiLU(),
@@ -2155,8 +2155,8 @@ class LatentDiffusionSRTextWT(DDPM):
             month_emb = self.time_embed(timestep_embedding(month_t, self.model_channels))
             day_t = torch.tensor([float(val) for val in batch["day"]]).to(self.device).long()
             day_emb = self.time_embed(timestep_embedding(day_t, self.model_channels))
-            #metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
-            metadata_embeddings = torch.cat([gsd_emb,cloud_emb,year_emb,month_emb,day_emb], dim=1)
+            metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
+            #metadata_embeddings = torch.cat([gsd_emb,cloud_emb,year_emb,month_emb,day_emb], dim=1)
             
         if hasattr(self, "dwt"):
             xll, xh = self.dwt(x)  # [b, 3, h, w], [b, 3, 3, h, w]
