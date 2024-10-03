@@ -42,11 +42,11 @@ class EmbedFC(nn.Module):
         self.emb_dim = emb_dim
         layers = [
             nn.Linear(input_dim, emb_dim),
-            nn.GELU(),
+            nn.SiLU(),
             nn.Linear(emb_dim, emb_dim),
         ]
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
-        x = x.view(-1, self.input_dim)
+        #x = x.view(-1, self.input_dim)
         return self.model(x)

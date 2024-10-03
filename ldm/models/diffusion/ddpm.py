@@ -1629,6 +1629,8 @@ class LatentDiffusionSRTextWT(DDPM):
         if wav_encoder is not None:
             self.dwt = DWTForward(J=1, mode='zero', wave='haar')
             self.iwt = DWTInverse(mode='zero', wave='haar')
+        if ship_embedder_config is not None :
+            self.instantiate_embed_stage(ship_embedder_config)
         self.wav_encoder = wav_encoder
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
@@ -1762,8 +1764,8 @@ class LatentDiffusionSRTextWT(DDPM):
         self.structcond_stage_model.train()
     def instantiate_embed_stage(self, config):
         model = instantiate_from_config(config)
-        self.ship_label_emb = model
-        self.ship_label_emb.train()
+        self.meta_embed = model
+        self.meta_embed.train()
     
     def instantiate_shipclassifier_stage(self, config):
         # model = instantiate_from_config(config)
@@ -2136,25 +2138,25 @@ class LatentDiffusionSRTextWT(DDPM):
             # print(e, "\nNo ship classifier found")
         
         if hasattr(self, "use_metadata"):
-            self.model_channels = 256
-            time_embed_dim = self.model_channels * 4
-            self.time_embed = nn.Sequential(
-              linear(self.model_channels, time_embed_dim),
-              nn.SiLU(),
-              linear(time_embed_dim, time_embed_dim),
-            )
-            self.time_embed.to(self.device)
+            #self.model_channels = 256
+            #time_embed_dim = self.model_channels * 4
+            #self.time_embed = nn.Sequential(
+            #  linear(self.model_channels, time_embed_dim),
+            #  nn.SiLU(),
+            #  linear(time_embed_dim, time_embed_dim),
+            #)
+            #self.time_embed.to(self.device)
             
             gsd_t = torch.tensor([float(val) for val in batch["gsd"]]).to(self.device).long()
-            gsd_emb = self.time_embed(timestep_embedding(gsd_t, self.model_channels))
+            gsd_emb = self.meta_embed(timestep_embedding(gsd_t, self.model_channels))
             cloud_t = torch.tensor([float(val) for val in batch["cloud_cover"]]).to(self.device).long()
-            cloud_emb = self.time_embed(timestep_embedding(cloud_t, self.model_channels))
+            cloud_emb = self.meta_embed(timestep_embedding(cloud_t, self.model_channels))
             year_t = torch.tensor([float(val) for val in batch["year"]]).to(self.device).long()
-            year_emb = self.time_embed(timestep_embedding(year_t, self.model_channels))
+            year_emb = self.meta_embed(timestep_embedding(year_t, self.model_channels))
             month_t = torch.tensor([float(val) for val in batch["month"]]).to(self.device).long()
-            month_emb = self.time_embed(timestep_embedding(month_t, self.model_channels))
+            month_emb = self.meta_embed(timestep_embedding(month_t, self.model_channels))
             day_t = torch.tensor([float(val) for val in batch["day"]]).to(self.device).long()
-            day_emb = self.time_embed(timestep_embedding(day_t, self.model_channels))
+            day_emb = self.meta_embed(timestep_embedding(day_t, self.model_channels))
             metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
             #metadata_embeddings = torch.cat([gsd_emb,cloud_emb,year_emb,month_emb,day_emb], dim=1)
             

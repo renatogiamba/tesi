@@ -87,11 +87,11 @@ model:
     #    num_classes: 20
     #    pretrained: True
     #    ckpt_path: checkpoints/ship_res_whole_image_classifier_ep4.pt
-    #ship_embedder_config:
-    #  target: ldm.ship_classifier.EmbedFC
-    #  params:
-    #    input_dim: 20 #1280 for features
-    #    emb_dim: 512
+    ship_embedder_config:
+      target: ldm.ship_classifier.EmbedFC
+      params:
+        input_dim: 256 
+        emb_dim: 1024
     structcond_stage_config:
       target: ldm.modules.diffusionmodules.openaimodel.EncoderUNetModelWT
       params:
@@ -141,7 +141,7 @@ degradation:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 6
+    batch_size: 18
     num_workers: 6
     wrap: false
     train:
