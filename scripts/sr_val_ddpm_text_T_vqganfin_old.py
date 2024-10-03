@@ -96,7 +96,7 @@ def load_model_from_config(config, ckpt, verbose=False):
 		if config.model.params.ship_embedder_config: #crasha sempre se non ci sta ma va bene cosi tanto ci sta l except
 			model_channels = config.model.params.structcond_stage_config.params.model_channels
 			time_embed_dim =  model_channels * 4 #changed from 4 to 2 for class embed
-			model.structcond_stage_model.meta_emb = nn.Sequential(
+			model.structcond_stage_model.time_embed = nn.Sequential(
 				linear(model_channels, time_embed_dim),
 				nn.SiLU(),
 				linear(time_embed_dim, time_embed_dim),
