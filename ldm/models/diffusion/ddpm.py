@@ -1764,8 +1764,8 @@ class LatentDiffusionSRTextWT(DDPM):
         self.structcond_stage_model.train()
     def instantiate_embed_stage(self, config):
         model = instantiate_from_config(config)
-        self.meta_embed = model
-        self.meta_embed.train()
+        self.meta_emb = model
+        self.meta_emb.train()
     
     def instantiate_shipclassifier_stage(self, config):
         # model = instantiate_from_config(config)
@@ -2148,15 +2148,15 @@ class LatentDiffusionSRTextWT(DDPM):
             #self.time_embed.to(self.device)
             
             gsd_t = torch.tensor([float(val) for val in batch["gsd"]]).to(self.device).long()
-            gsd_emb = self.meta_embed(timestep_embedding(gsd_t, self.model_channels))
+            gsd_emb = self.meta_emb(timestep_embedding(gsd_t, self.model_channels))
             cloud_t = torch.tensor([float(val) for val in batch["cloud_cover"]]).to(self.device).long()
-            cloud_emb = self.meta_embed(timestep_embedding(cloud_t, self.model_channels))
+            cloud_emb = self.meta_emb(timestep_embedding(cloud_t, self.model_channels))
             year_t = torch.tensor([float(val) for val in batch["year"]]).to(self.device).long()
-            year_emb = self.meta_embed(timestep_embedding(year_t, self.model_channels))
+            year_emb = self.meta_emb(timestep_embedding(year_t, self.model_channels))
             month_t = torch.tensor([float(val) for val in batch["month"]]).to(self.device).long()
-            month_emb = self.meta_embed(timestep_embedding(month_t, self.model_channels))
+            month_emb = self.meta_emb(timestep_embedding(month_t, self.model_channels))
             day_t = torch.tensor([float(val) for val in batch["day"]]).to(self.device).long()
-            day_emb = self.meta_embed(timestep_embedding(day_t, self.model_channels))
+            day_emb = self.meta_emb(timestep_embedding(day_t, self.model_channels))
             metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
             #metadata_embeddings = torch.cat([gsd_emb,cloud_emb,year_emb,month_emb,day_emb], dim=1)
             

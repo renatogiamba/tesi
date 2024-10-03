@@ -96,7 +96,7 @@ def load_model_from_config(config, ckpt, verbose=False):
 		if config.model.params.ship_embedder_config: #crasha sempre se non ci sta ma va bene cosi tanto ci sta l except
 			model_channels = config.model.params.structcond_stage_config.params.model_channels
 			time_embed_dim =  model_channels * 4 #changed from 4 to 2 for class embed
-			model.structcond_stage_model.time_embed = nn.Sequential(
+			model.structcond_stage_model.meta_emb = nn.Sequential(
 				linear(model_channels, time_embed_dim),
 				nn.SiLU(),
 				linear(time_embed_dim, time_embed_dim),
@@ -364,15 +364,15 @@ def main():
 						#time_embed.to(device)
 
 						gsd_t = torch.tensor([float(gsd)]).to(device).long()
-						gsd_emb = model.time_embed(timestep_embedding(gsd_t, model_channels))
+						gsd_emb = model.meta_emb(timestep_embedding(gsd_t, model_channels))
 						cloud_t = torch.tensor([float(cloud_cover)]).to(device).long()
-						cloud_emb = model.time_embed(timestep_embedding(cloud_t, model_channels))
+						cloud_emb = model.meta_emb(timestep_embedding(cloud_t, model_channels))
 						year_t = torch.tensor([float(year)]).to(device).long()
-						year_emb = model.time_embed(timestep_embedding(year_t, model_channels))
+						year_emb = model.meta_emb(timestep_embedding(year_t, model_channels))
 						month_t = torch.tensor([float(month)]).to(device).long()
-						month_emb = model.time_embed(timestep_embedding(month_t, model_channels))
+						month_emb = model.meta_emb(timestep_embedding(month_t, model_channels))
 						day_t = torch.tensor([float(day)]).to(device).long()
-						day_emb = model.time_embed(timestep_embedding(day_t, model_channels))
+						day_emb = model.meta_emb(timestep_embedding(day_t, model_channels))
 						metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
 						#classes_embed = model.ship_label_emb(model.ship_classifier(init_image))
 					except:
