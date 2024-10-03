@@ -2138,7 +2138,7 @@ class LatentDiffusionSRTextWT(DDPM):
             # print(e, "\nNo ship classifier found")
         
         if hasattr(self, "use_metadata"):
-            #self.model_channels = 256
+            self.model_channels = 256
             #time_embed_dim = self.model_channels * 4
             #self.time_embed = nn.Sequential(
             #  linear(self.model_channels, time_embed_dim),
