@@ -3157,7 +3157,7 @@ class LatentDiffusionSRTextWT(DDPM):
         use_ddim = ddim_steps is not None
 
         log = dict()
-        z, c_lq, z_gt, x, gt, yrec, xc, classes_embed = self.get_input(batch, self.first_stage_key,
+        z, c_lq, z_gt, x, gt, yrec, xc, classes_embed = self.get_input(batch[0], self.first_stage_key,
                                            return_first_stage_outputs=True,
                                            force_c_encode=True,
                                            return_original_cond=True,
