@@ -92,6 +92,11 @@ model:
       params:
         input_dim: 256 
         emb_dim: 1024
+    #wavelet_embedder_config:
+    #  target: ldm.ship_classifier.Wave_Emb
+    #  params:
+    #    input_dim: 2048
+    #    emb_dim: 512
     structcond_stage_config:
       target: ldm.modules.diffusionmodules.openaimodel.EncoderUNetModelWT
       params:

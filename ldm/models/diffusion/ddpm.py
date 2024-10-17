@@ -5,8 +5,9 @@ https://github.com/openai/improved-diffusion/blob/e94489283bb876ac1477d5dd7709bb
 https://github.com/CompVis/taming-transformers
 -- merci
 """
-
-#from pytorch_wavelets import DWTForward, DWTInverse
+import clip
+import pywt
+from pytorch_wavelets import DWTForward
 import torch
 import torch.nn as nn
 import numpy as np
@@ -1587,6 +1588,7 @@ class LatentDiffusionSRTextWT(DDPM):
                  ship_classifier_config=None,
                  guidance_loss_scale = 30,
                  ship_embedder_config=None,
+                 #wavelet_embedder_config=None,
                  wav_encoder=None,
                  use_metadata=True,
                  *args, **kwargs):
@@ -1631,6 +1633,8 @@ class LatentDiffusionSRTextWT(DDPM):
             self.iwt = DWTInverse(mode='zero', wave='haar')
         if ship_embedder_config is not None :
             self.instantiate_embed_stage(ship_embedder_config)
+        #if wavelet_embedder_config is not None :
+        #    self.instantiate_wav_embed_stage(wavelet_embedder_config)
         self.wav_encoder = wav_encoder
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
@@ -1766,6 +1770,10 @@ class LatentDiffusionSRTextWT(DDPM):
         model = instantiate_from_config(config)
         self.meta_emb = model
         self.meta_emb.train()
+    #def instantiate_wav_embed_stage(self, config):
+    #    model = instantiate_from_config(config)
+    #    self.wav_emb = model
+    #    self.wav_emb.train()
     
     def instantiate_shipclassifier_stage(self, config):
         # model = instantiate_from_config(config)
@@ -2138,14 +2146,27 @@ class LatentDiffusionSRTextWT(DDPM):
             # print(e, "\nNo ship classifier found")
         
         if hasattr(self, "use_metadata"):
+            dwt = DWTForward(J=1, mode='zero', wave='haar').cuda()
+            x_srll, x_srh = dwt(x)  
+            x_srlh, x_srhl, x_srhh = torch.unbind(x_srh[0], dim=2)
+            x_waves = torch.cat([x_srll, x_srlh, x_srhl, x_srhh], dim=1)
+
+            Vit_model, _ = clip.load("ViT-B/32", device="cuda")
+
+            x_waves = F.interpolate(x_waves, size=(224,224), mode='bilinear', align_corners=False)
+            with torch.no_grad():
+                x_waves = torch.stack([Vit_model.encode_image(sub_x_waves) for sub_x_waves in x_waves.split(3, dim=1)], dim=0).cuda()
+                x_waves = x_waves.reshape(-1,4,512)
+
+            batch_size = x_waves.shape[0]
+            wavelet_embeddings = []
+            for i in range(batch_size):
+                t = x_waves[i]
+                wav_embed = self.wav_emb(t.type(torch.float32))
+                wavelet_embeddings.append(wav_embed)
+            wavelet_embeddings = torch.cat(wavelet_embeddings, dim=0)
+
             self.model_channels = 256
-            #time_embed_dim = self.model_channels * 4
-            #self.time_embed = nn.Sequential(
-            #  linear(self.model_channels, time_embed_dim),
-            #  nn.SiLU(),
-            #  linear(time_embed_dim, time_embed_dim),
-            #)
-            #self.time_embed.to(self.device)
             
             gsd_t = torch.tensor([float(val) for val in batch["gsd"]]).to(self.device).long()
             gsd_emb = self.meta_emb(timestep_embedding(gsd_t, self.model_channels))
@@ -2159,6 +2180,8 @@ class LatentDiffusionSRTextWT(DDPM):
             day_emb = self.meta_emb(timestep_embedding(day_t, self.model_channels))
             metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
             #metadata_embeddings = torch.cat([gsd_emb,cloud_emb,year_emb,month_emb,day_emb], dim=1)
+
+            wave_meta_embeddings = torch.cat([wavelet_embeddings,metadata_embeddings],dim=1)
             
         if hasattr(self, "dwt"):
             xll, xh = self.dwt(x)  # [b, 3, h, w], [b, 3, 3, h, w]
@@ -2201,7 +2224,7 @@ class LatentDiffusionSRTextWT(DDPM):
         #if hasattr(self, "ship_classifier"):
         #    out.append(classes_embedding)
         if hasattr(self, "use_metadata"):
-            out.append(metadata_embeddings)
+            out.append(wave_meta_embeddings)
         elif hasattr(self, "dwt"):
             out.append(x_lq_wav)
         else:
