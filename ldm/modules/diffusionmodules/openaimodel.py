@@ -1390,8 +1390,8 @@ class EncoderUNetModelWT(nn.Module):
         self.num_head_channels = num_head_channels
         self.num_heads_upsample = num_heads_upsample
 
-        time_embed_dim = model_channels * 8
-        time_embed_dim_ = model_channels * 4
+        time_embed_dim = model_channels * 6
+        time_embed_dim_ = model_channels * 2
         self.time_embed = nn.Sequential(
             linear(model_channels, time_embed_dim_),
             nn.SiLU(),

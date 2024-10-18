@@ -1588,7 +1588,7 @@ class LatentDiffusionSRTextWT(DDPM):
                  ship_classifier_config=None,
                  guidance_loss_scale = 30,
                  ship_embedder_config=None,
-                 #wavelet_embedder_config=None,
+                 wavelet_embedder_config=None,
                  wav_encoder=None,
                  use_metadata=True,
                  *args, **kwargs):
@@ -1633,8 +1633,8 @@ class LatentDiffusionSRTextWT(DDPM):
             self.iwt = DWTInverse(mode='zero', wave='haar')
         if ship_embedder_config is not None :
             self.instantiate_embed_stage(ship_embedder_config)
-        #if wavelet_embedder_config is not None :
-        #    self.instantiate_wav_embed_stage(wavelet_embedder_config)
+        if wavelet_embedder_config is not None :
+            self.instantiate_wav_embed_stage(wavelet_embedder_config)
         self.wav_encoder = wav_encoder
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
@@ -1770,10 +1770,10 @@ class LatentDiffusionSRTextWT(DDPM):
         model = instantiate_from_config(config)
         self.meta_emb = model
         self.meta_emb.train()
-    #def instantiate_wav_embed_stage(self, config):
-    #    model = instantiate_from_config(config)
-    #    self.wav_emb = model
-    #    self.wav_emb.train()
+    def instantiate_wav_embed_stage(self, config):
+        model = instantiate_from_config(config)
+        self.wav_emb = model
+        self.wav_emb.train()
     
     def instantiate_shipclassifier_stage(self, config):
         # model = instantiate_from_config(config)
@@ -2150,14 +2150,10 @@ class LatentDiffusionSRTextWT(DDPM):
             x_srll, x_srh = dwt(x)  
             x_srlh, x_srhl, x_srhh = torch.unbind(x_srh[0], dim=2)
             x_waves = torch.cat([x_srll, x_srlh, x_srhl, x_srhh], dim=1)
-
-            Vit_model, _ = clip.load("ViT-B/32", device="cuda")
-
             x_waves = F.interpolate(x_waves, size=(224,224), mode='bilinear', align_corners=False)
             with torch.no_grad():
-                x_waves = torch.stack([Vit_model.encode_image(sub_x_waves) for sub_x_waves in x_waves.split(3, dim=1)], dim=0).cuda()
+                x_waves = torch.stack([self.Vit_model.encode_image(sub_x_waves) for sub_x_waves in x_waves.split(3, dim=1)], dim=0).cuda()
                 x_waves = x_waves.reshape(-1,4,512)
-
             batch_size = x_waves.shape[0]
             wavelet_embeddings = []
             for i in range(batch_size):
@@ -2224,6 +2220,7 @@ class LatentDiffusionSRTextWT(DDPM):
         #if hasattr(self, "ship_classifier"):
         #    out.append(classes_embedding)
         if hasattr(self, "use_metadata"):
+            #out.append(metadata_embeddings)
             out.append(wave_meta_embeddings)
         elif hasattr(self, "dwt"):
             out.append(x_lq_wav)
