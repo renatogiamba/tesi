@@ -1,5 +1,7 @@
 """make variations of input image"""
 
+from pytorch_wavelets import DWTForward
+import torch.nn.functional as F
 import argparse, os, sys, glob, csv
 import PIL
 import random
@@ -95,7 +97,7 @@ def load_model_from_config(config, ckpt, verbose=False):
 	try:
 		if config.model.params.ship_embedder_config: #crasha sempre se non ci sta ma va bene cosi tanto ci sta l except
 			model_channels = config.model.params.structcond_stage_config.params.model_channels
-			time_embed_dim =  model_channels * 4 #changed from 4 to 2 for class embed
+			time_embed_dim =  model_channels * 2 #changed from 4 to 2 for class embed
 			model.structcond_stage_model.time_embed = nn.Sequential(
 				linear(model_channels, time_embed_dim),
 				nn.SiLU(),
@@ -336,7 +338,7 @@ def main():
 	model.ori_timesteps = list(use_timesteps)
 	model.ori_timesteps.sort()
 	model = model.to(device)
-	meta_info = get_all_csv_info_as_dict("/content/ShipinSight/content/test_csv")
+	meta_info = get_all_csv_info_as_dict("/content/tesi/content/test_csv")
 
 	precision_scope = autocast if opt.precision == "autocast" else nullcontext
 	niqe_list = []
@@ -353,7 +355,23 @@ def main():
 					#text_init = ['']*init_image.size(0)
 					text_init = text_prompt
 					semantic_c = model.cond_stage_model(text_init)
-					try:	
+					try:
+						dwt = DWTForward(J=1, mode='zero', wave='haar').cuda()
+						x_srll, x_srh = dwt(init_image)  
+						x_srlh, x_srhl, x_srhh = torch.unbind(x_srh[0], dim=2)
+						x_waves = torch.cat([x_srll, x_srlh, x_srhl, x_srhh], dim=1)
+						x_waves = F.interpolate(x_waves, size=(224,224), mode='bilinear', align_corners=False)
+						with torch.no_grad():
+							x_waves = torch.stack([model.Vit_model.encode_image(sub_x_waves) for sub_x_waves in x_waves.split(3, dim=1)], dim=0).cuda()
+							x_waves = x_waves.reshape(-1,4,512)
+							batch_size = x_waves.shape[0]
+							wavelet_embeddings = []
+							for i in range(batch_size):
+								t = x_waves[i]
+								wav_embed = model.wav_emb(t.type(torch.float32))
+								wavelet_embeddings.append(wav_embed)
+						wavelet_embeddings = torch.cat(wavelet_embeddings, dim=0)
+	
 						model_channels = 256
 						#time_embed_dim = model_channels * 4
 						#time_embed = nn.Sequential(
@@ -375,6 +393,8 @@ def main():
 						day_emb = model.meta_emb(timestep_embedding(day_t, model_channels))
 						metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
 						#classes_embed = model.ship_label_emb(model.ship_classifier(init_image))
+
+						wave_meta_embeddings = torch.cat([wavelet_embeddings,metadata_embeddings],dim=1)
 					except:
 						classes_embed = None
 						print("No class embed")
@@ -387,7 +407,7 @@ def main():
 
 					samples, _ = model.sample(cond=semantic_c, struct_cond=init_latent, batch_size=init_image.size(0), 
 							   timesteps=opt.ddpm_steps, time_replace=opt.ddpm_steps, x_T=x_T, return_intermediates=True,
-							   classes_embed=metadata_embeddings)
+							   classes_embed=wave_meta_embeddings)
 					x_samples = vq_model.decode(samples * 1. / model.scale_factor, enc_fea_lq)
 					if opt.colorfix_type == 'adain':
 						x_samples = adaptive_instance_normalization(x_samples, init_image)

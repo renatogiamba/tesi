@@ -1635,6 +1635,9 @@ class LatentDiffusionSRTextWT(DDPM):
             self.instantiate_embed_stage(ship_embedder_config)
         if wavelet_embedder_config is not None :
             self.instantiate_wav_embed_stage(wavelet_embedder_config)
+        self.Vit_model, _ = clip.load("ViT-B/32", device="cuda")
+        for param in self.Vit_model.parameters():
+            param.requires_grad = False
         self.wav_encoder = wav_encoder
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
