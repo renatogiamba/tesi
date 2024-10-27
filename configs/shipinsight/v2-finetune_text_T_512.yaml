@@ -91,12 +91,12 @@ model:
       target: ldm.ship_classifier.EmbedFC
       params:
         input_dim: 256 
-        emb_dim: 512
-    wavelet_embedder_config:
-      target: ldm.ship_classifier.Wave_Emb
-      params:
-        input_dim: 2048
-        emb_dim: 512
+        emb_dim: 1024
+    #wavelet_embedder_config:
+    #  target: ldm.ship_classifier.Wave_Emb
+    #  params:
+    #    input_dim: 2048
+    #    emb_dim: 512
     structcond_stage_config:
       target: ldm.modules.diffusionmodules.openaimodel.EncoderUNetModelWT
       params:
@@ -155,8 +155,9 @@ data:
 
       params:
         queue_size: 180
+        #gt_path: /content/tesi/content/train
         gt_path: /content/tesi/content/train/gts
-        lr_path: /content/tesi/content/train/inputs
+        lr_path: /content/tesi/content/train/inputs/
         crop_size: 512
         io_backend:
           type: disk
@@ -183,12 +184,14 @@ data:
         use_hflip: False
         use_rot: False
     validation:
-      # target: basicsr.data.realesrgan_dataset.RealESRGANDataset
-      target: basicsr.data.shipspotting_dataset.ShipSpottingDataset
+      #target: basicsr.data.shipspotting_dataset.ShipSpottingDataset
+      target: basicsr.data.fmow_sentinel_dataset.FmowSentinelDataset
 
       params:
         # gt_path: /mnt/lustre/share/jywang/dataset/ImageSR/DIV2K/DIV2K_train_HR/
-        gt_path: /content/tesi/content/val
+        #gt_path: /content/tesi/content/val
+        gt_path: /content/tesi/content/train/gts
+        lr_path: /content/tesi/content/train/inputs/
         crop_size: 512
         io_backend:
           type: disk

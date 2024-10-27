@@ -43,7 +43,7 @@ class FmowSentinelDataset(data.Dataset):
         else:
             self.crop_size = 512
         if 'image_type' not in opt:
-            opt['image_type'] = 'jpg'
+            opt['image_type'] = 'png'
 
         # support multiple type of data: file path and meta data, remove support of lmdb
         self.paths = []
@@ -105,8 +105,8 @@ class FmowSentinelDataset(data.Dataset):
                 retry -= 1
 
         lr_filename = os.path.basename(gt_path)
-        lr_path = os.join(self.lr_path, lr_filename)
-        img_lr = self.file_client.get(lr_path, 'lr')
+        lr_path = self.lr_path + lr_filename
+        img_lr = self.file_client.get(lr_path, 'lq')
         img_lr = imfrombytes(img_lr, float32=True)
 
         # BGR to RGB, HWC to CHW, numpy to tensor
@@ -114,7 +114,7 @@ class FmowSentinelDataset(data.Dataset):
         img_lr = img2tensor([img_lr], bgr2rgb=True, float32=True)[0]
 
         return_d = {'gt': img_gt,
-                    'lr': img_lr,
+                    'lq': img_lr,
                     'gt_path': gt_path}
         
         category, country, gsd, cloud_cover, year, month, day = self.get_metadata(index)
