@@ -1588,7 +1588,7 @@ class LatentDiffusionSRTextWT(DDPM):
                  ship_classifier_config=None,
                  guidance_loss_scale = 30,
                  ship_embedder_config=None,
-                 wavelet_embedder_config=None,
+                 #wavelet_embedder_config=None,
                  wav_encoder=None,
                  use_metadata=True,
                  *args, **kwargs):
@@ -1633,11 +1633,11 @@ class LatentDiffusionSRTextWT(DDPM):
             self.iwt = DWTInverse(mode='zero', wave='haar')
         if ship_embedder_config is not None :
             self.instantiate_embed_stage(ship_embedder_config)
-        if wavelet_embedder_config is not None :
-            self.instantiate_wav_embed_stage(wavelet_embedder_config)
-        self.Vit_model, _ = clip.load("ViT-B/32", device="cuda")
-        for param in self.Vit_model.parameters():
-            param.requires_grad = False
+        #if wavelet_embedder_config is not None :
+        #    self.instantiate_wav_embed_stage(wavelet_embedder_config)
+        #self.Vit_model, _ = clip.load("ViT-B/32", device="cuda")
+        #for param in self.Vit_model.parameters():
+        #    param.requires_grad = False
         self.wav_encoder = wav_encoder
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
@@ -1773,10 +1773,10 @@ class LatentDiffusionSRTextWT(DDPM):
         model = instantiate_from_config(config)
         self.meta_emb = model
         self.meta_emb.train()
-    def instantiate_wav_embed_stage(self, config):
-        model = instantiate_from_config(config)
-        self.wav_emb = model
-        self.wav_emb.train()
+    #def instantiate_wav_embed_stage(self, config):
+    #    model = instantiate_from_config(config)
+    #    self.wav_emb = model
+    #    self.wav_emb.train()
     
     def instantiate_shipclassifier_stage(self, config):
         # model = instantiate_from_config(config)
@@ -1986,148 +1986,151 @@ class LatentDiffusionSRTextWT(DDPM):
             usm_sharpener = USMSharp().cuda()  # do usm sharpening
 
         im_gt = batch['gt'].cuda()
+        ##############################
+        im_lq = batch['lq'].cuda()
+        ##############################
         if self.use_usm:
             im_gt = usm_sharpener(im_gt)
         im_gt = im_gt.to(memory_format=torch.contiguous_format).float()
-        kernel1 = batch['kernel1'].cuda()
-        kernel2 = batch['kernel2'].cuda()
-        sinc_kernel = batch['sinc_kernel'].cuda()
+        #kernel1 = batch['kernel1'].cuda()
+        #kernel2 = batch['kernel2'].cuda()
+        #sinc_kernel = batch['sinc_kernel'].cuda()
 
-        ori_h, ori_w = im_gt.size()[2:4]
+        #ori_h, ori_w = im_gt.size()[2:4]
 
-        # ----------------------- The first degradation process ----------------------- #
-        # blur
-        out = filter2D(im_gt, kernel1)
-        # random resize
-        updown_type = random.choices(
-                ['up', 'down', 'keep'],
-                self.configs.degradation['resize_prob'],
-                )[0]
-        if updown_type == 'up':
-            scale = random.uniform(1, self.configs.degradation['resize_range'][1])
-        elif updown_type == 'down':
-            scale = random.uniform(self.configs.degradation['resize_range'][0], 1)
-        else:
-            scale = 1
-        mode = random.choice(['area', 'bilinear', 'bicubic'])
-        out = F.interpolate(out, scale_factor=scale, mode=mode)
-        # add noise
-        gray_noise_prob = self.configs.degradation['gray_noise_prob']
-        if random.random() < self.configs.degradation['gaussian_noise_prob']:
-            out = random_add_gaussian_noise_pt(
-                out,
-                sigma_range=self.configs.degradation['noise_range'],
-                clip=True,
-                rounds=False,
-                gray_prob=gray_noise_prob,
-                )
-        else:
-            out = random_add_poisson_noise_pt(
-                out,
-                scale_range=self.configs.degradation['poisson_scale_range'],
-                gray_prob=gray_noise_prob,
-                clip=True,
-                rounds=False)
-        # JPEG compression
-        jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.configs.degradation['jpeg_range'])
-        out = torch.clamp(out, 0, 1)  # clamp to [0, 1], otherwise JPEGer will result in unpleasant artifacts
-        out = jpeger(out, quality=jpeg_p)
+        ## ----------------------- The first degradation process ----------------------- #
+        ## blur
+        #out = filter2D(im_gt, kernel1)
+        ## random resize
+        #updown_type = random.choices(
+        #        ['up', 'down', 'keep'],
+        #        self.configs.degradation['resize_prob'],
+        #        )[0]
+        #if updown_type == 'up':
+        #    scale = random.uniform(1, self.configs.degradation['resize_range'][1])
+        #elif updown_type == 'down':
+        #    scale = random.uniform(self.configs.degradation['resize_range'][0], 1)
+        #else:
+        #    scale = 1
+        #mode = random.choice(['area', 'bilinear', 'bicubic'])
+        #out = F.interpolate(out, scale_factor=scale, mode=mode)
+        ## add noise
+        #gray_noise_prob = self.configs.degradation['gray_noise_prob']
+        #if random.random() < self.configs.degradation['gaussian_noise_prob']:
+        #    out = random_add_gaussian_noise_pt(
+        #        out,
+        #        sigma_range=self.configs.degradation['noise_range'],
+        #        clip=True,
+        #        rounds=False,
+        #        gray_prob=gray_noise_prob,
+        #        )
+        #else:
+        #    out = random_add_poisson_noise_pt(
+        #        out,
+        #        scale_range=self.configs.degradation['poisson_scale_range'],
+        #        gray_prob=gray_noise_prob,
+        #        clip=True,
+        #        rounds=False)
+        ## JPEG compression
+        #jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.configs.degradation['jpeg_range'])
+        #out = torch.clamp(out, 0, 1)  # clamp to [0, 1], otherwise JPEGer will result in unpleasant artifacts
+        #out = jpeger(out, quality=jpeg_p)
 
-        # ----------------------- The second degradation process ----------------------- #
-        # blur
-        if random.random() < self.configs.degradation['second_blur_prob']:
-            out = filter2D(out, kernel2)
-        # random resize
-        updown_type = random.choices(
-                ['up', 'down', 'keep'],
-                self.configs.degradation['resize_prob2'],
-                )[0]
-        if updown_type == 'up':
-            scale = random.uniform(1, self.configs.degradation['resize_range2'][1])
-        elif updown_type == 'down':
-            scale = random.uniform(self.configs.degradation['resize_range2'][0], 1)
-        else:
-            scale = 1
-        mode = random.choice(['area', 'bilinear', 'bicubic'])
-        out = F.interpolate(
-                out,
-                size=(int(ori_h / self.configs.sf * scale),
-                      int(ori_w / self.configs.sf * scale)),
-                mode=mode,
-                )
-        # add noise
-        gray_noise_prob = self.configs.degradation['gray_noise_prob2']
-        if random.random() < self.configs.degradation['gaussian_noise_prob2']:
-            out = random_add_gaussian_noise_pt(
-                out,
-                sigma_range=self.configs.degradation['noise_range2'],
-                clip=True,
-                rounds=False,
-                gray_prob=gray_noise_prob,
-                )
-        else:
-            out = random_add_poisson_noise_pt(
-                out,
-                scale_range=self.configs.degradation['poisson_scale_range2'],
-                gray_prob=gray_noise_prob,
-                clip=True,
-                rounds=False,
-                )
+        ## ----------------------- The second degradation process ----------------------- #
+        ## blur
+        #if random.random() < self.configs.degradation['second_blur_prob']:
+        #    out = filter2D(out, kernel2)
+        ## random resize
+        #updown_type = random.choices(
+        #        ['up', 'down', 'keep'],
+        #        self.configs.degradation['resize_prob2'],
+        #        )[0]
+        #if updown_type == 'up':
+        #    scale = random.uniform(1, self.configs.degradation['resize_range2'][1])
+        #elif updown_type == 'down':
+        #    scale = random.uniform(self.configs.degradation['resize_range2'][0], 1)
+        #else:
+        #    scale = 1
+        #mode = random.choice(['area', 'bilinear', 'bicubic'])
+        #out = F.interpolate(
+        #        out,
+        #        size=(int(ori_h / self.configs.sf * scale),
+        #              int(ori_w / self.configs.sf * scale)),
+        #        mode=mode,
+        #        )
+        ## add noise
+        #gray_noise_prob = self.configs.degradation['gray_noise_prob2']
+        #if random.random() < self.configs.degradation['gaussian_noise_prob2']:
+        #    out = random_add_gaussian_noise_pt(
+        #        out,
+        #        sigma_range=self.configs.degradation['noise_range2'],
+        #        clip=True,
+        #        rounds=False,
+        #        gray_prob=gray_noise_prob,
+        #        )
+        #else:
+        #    out = random_add_poisson_noise_pt(
+        #        out,
+        #        scale_range=self.configs.degradation['poisson_scale_range2'],
+        #        gray_prob=gray_noise_prob,
+        #        clip=True,
+        #        rounds=False,
+        #        )
 
-        # JPEG compression + the final sinc filter
-        # We also need to resize images to desired sizes. We group [resize back + sinc filter] together
-        # as one operation.
-        # We consider two orders:
-        #   1. [resize back + sinc filter] + JPEG compression
-        #   2. JPEG compression + [resize back + sinc filter]
-        # Empirically, we find other combinations (sinc + JPEG + Resize) will introduce twisted lines.
-        if random.random() < 0.5:
-            # resize back + the final sinc filter
-            mode = random.choice(['area', 'bilinear', 'bicubic'])
-            out = F.interpolate(
-                    out,
-                    size=(ori_h // self.configs.sf,
-                          ori_w // self.configs.sf),
-                    mode=mode,
-                    )
-            out = filter2D(out, sinc_kernel)
-            # JPEG compression
-            jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.configs.degradation['jpeg_range2'])
-            out = torch.clamp(out, 0, 1)
-            out = jpeger(out, quality=jpeg_p)
-        else:
-            # JPEG compression
-            jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.configs.degradation['jpeg_range2'])
-            out = torch.clamp(out, 0, 1)
-            out = jpeger(out, quality=jpeg_p)
-            # resize back + the final sinc filter
-            mode = random.choice(['area', 'bilinear', 'bicubic'])
-            out = F.interpolate(
-                    out,
-                    size=(ori_h // self.configs.sf,
-                          ori_w // self.configs.sf),
-                    mode=mode,
-                    )
-            out = filter2D(out, sinc_kernel)
+        ## JPEG compression + the final sinc filter
+        ## We also need to resize images to desired sizes. We group [resize back + sinc filter] together
+        ## as one operation.
+        ## We consider two orders:
+        ##   1. [resize back + sinc filter] + JPEG compression
+        ##   2. JPEG compression + [resize back + sinc filter]
+        ## Empirically, we find other combinations (sinc + JPEG + Resize) will introduce twisted lines.
+        #if random.random() < 0.5:
+        #    # resize back + the final sinc filter
+        #    mode = random.choice(['area', 'bilinear', 'bicubic'])
+        #    out = F.interpolate(
+        #            out,
+        #            size=(ori_h // self.configs.sf,
+        #                  ori_w // self.configs.sf),
+        #            mode=mode,
+        #            )
+        #    out = filter2D(out, sinc_kernel)
+        #    # JPEG compression
+        #    jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.configs.degradation['jpeg_range2'])
+        #    out = torch.clamp(out, 0, 1)
+        #    out = jpeger(out, quality=jpeg_p)
+        #else:
+        #    # JPEG compression
+        #    jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.configs.degradation['jpeg_range2'])
+        #    out = torch.clamp(out, 0, 1)
+        #    out = jpeger(out, quality=jpeg_p)
+        #    # resize back + the final sinc filter
+        #    mode = random.choice(['area', 'bilinear', 'bicubic'])
+        #    out = F.interpolate(
+        #            out,
+        #            size=(ori_h // self.configs.sf,
+        #                  ori_w // self.configs.sf),
+        #            mode=mode,
+        #            )
+        #    out = filter2D(out, sinc_kernel)
 
-        # clamp and round
-        im_lq = torch.clamp(out, 0, 1.0)
+        ## clamp and round
+        #im_lq = torch.clamp(out, 0, 1.0)
 
         # random crop
-        gt_size = self.configs.degradation['gt_size']
-        im_gt, im_lq = paired_random_crop(im_gt, im_lq, gt_size, self.configs.sf)
+        #gt_size = self.configs.degradation['gt_size']
+        #im_gt, im_lq = paired_random_crop(im_gt, im_lq, gt_size, self.configs.sf)
         self.lq, self.gt = im_lq, im_gt
 
-        if resize_lq:
-            self.lq = F.interpolate(
-                    self.lq,
-                    size=(self.gt.size(-2),
-                          self.gt.size(-1)),
-                    mode='bicubic',
-                    )
+        #if resize_lq:
+        #    self.lq = F.interpolate(
+        #            self.lq,
+        #            size=(self.gt.size(-2),
+        #                  self.gt.size(-1)),
+        #            mode='bicubic',
+        #            )
 
-        if random.random() < self.configs.degradation['no_degradation_prob'] or torch.isnan(self.lq).any():
-            self.lq = self.gt
+        #if random.random() < self.configs.degradation['no_degradation_prob'] or torch.isnan(self.lq).any():
+        #    self.lq = self.gt
 
         # training pair pool
         if not val and not self.random_size:
@@ -2149,21 +2152,21 @@ class LatentDiffusionSRTextWT(DDPM):
             # print(e, "\nNo ship classifier found")
         
         if hasattr(self, "use_metadata"):
-            dwt = DWTForward(J=1, mode='zero', wave='haar').cuda()
-            x_srll, x_srh = dwt(x)  
-            x_srlh, x_srhl, x_srhh = torch.unbind(x_srh[0], dim=2)
-            x_waves = torch.cat([x_srll, x_srlh, x_srhl, x_srhh], dim=1)
-            x_waves = F.interpolate(x_waves, size=(224,224), mode='bilinear', align_corners=False)
-            with torch.no_grad():
-                x_waves = torch.stack([self.Vit_model.encode_image(sub_x_waves) for sub_x_waves in x_waves.split(3, dim=1)], dim=0).cuda()
-                x_waves = x_waves.reshape(-1,4,512)
-            batch_size = x_waves.shape[0]
-            wavelet_embeddings = []
-            for i in range(batch_size):
-                t = x_waves[i]
-                wav_embed = self.wav_emb(t.type(torch.float32))
-                wavelet_embeddings.append(wav_embed)
-            wavelet_embeddings = torch.cat(wavelet_embeddings, dim=0)
+            #dwt = DWTForward(J=1, mode='zero', wave='haar').cuda()
+            #x_srll, x_srh = dwt(x)  
+            #x_srlh, x_srhl, x_srhh = torch.unbind(x_srh[0], dim=2)
+            #x_waves = torch.cat([x_srll, x_srlh, x_srhl, x_srhh], dim=1)
+            #x_waves = F.interpolate(x_waves, size=(224,224), mode='bilinear', align_corners=False)
+            #with torch.no_grad():
+            #    x_waves = torch.stack([self.Vit_model.encode_image(sub_x_waves) for sub_x_waves in x_waves.split(3, dim=1)], dim=0).cuda()
+            #    x_waves = x_waves.reshape(-1,4,512)
+            #batch_size = x_waves.shape[0]
+            #wavelet_embeddings = []
+            #for i in range(batch_size):
+            #    t = x_waves[i]
+            #    wav_embed = self.wav_emb(t.type(torch.float32))
+            #    wavelet_embeddings.append(wav_embed)
+            #wavelet_embeddings = torch.cat(wavelet_embeddings, dim=0)
 
             self.model_channels = 256
             
@@ -2180,7 +2183,7 @@ class LatentDiffusionSRTextWT(DDPM):
             metadata_embeddings = gsd_emb + cloud_emb + year_emb + month_emb + day_emb
             #metadata_embeddings = torch.cat([gsd_emb,cloud_emb,year_emb,month_emb,day_emb], dim=1)
 
-            wave_meta_embeddings = torch.cat([wavelet_embeddings,metadata_embeddings],dim=1)
+            #wave_meta_embeddings = torch.cat([wavelet_embeddings,metadata_embeddings],dim=1)
             
         if hasattr(self, "dwt"):
             xll, xh = self.dwt(x)  # [b, 3, h, w], [b, 3, 3, h, w]
@@ -2223,8 +2226,8 @@ class LatentDiffusionSRTextWT(DDPM):
         #if hasattr(self, "ship_classifier"):
         #    out.append(classes_embedding)
         if hasattr(self, "use_metadata"):
-            #out.append(metadata_embeddings)
-            out.append(wave_meta_embeddings)
+            out.append(metadata_embeddings)
+            #out.append(wave_meta_embeddings)
         elif hasattr(self, "dwt"):
             out.append(x_lq_wav)
         else:
